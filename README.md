@@ -1,48 +1,28 @@
 # Offer 决策工作台
 
-一个面向校招 / 社招求职者的 `Offer Decision Copilot`。  
-它不是泛化聊天框，而是一个围绕真实决策场景设计的研究工作台：用户可以导入自己的 `Offer`、`JD`、面试反馈和 `HR` 补充信息，系统会先做结构化整理，再产出一份带依据、带保留项、带核验清单的比较建议。
+一个面向真实求职决策场景的智能工作台，用于接收候选人的 `Offer`、`JD`、面试反馈和 `HR` 补充信息，生成带证据、带风险提示、带核验建议的对比分析结果。
 
-## 为什么做这个项目
+系统采用 `Retrieval-first` 研究架构：先检索公开信号，再由模型完成结构化总结，最后由 `Java` 决策服务完成评分合并、降级治理和结果编排。
 
-多数 AI 项目停留在“问一句，回一段话”。  
-但 Offer 决策本质上不是一次性问答，而是一个高不确定性的决策流程：
+## 核心能力
 
-- 先明确职业目标和风险偏好
-- 再把多个机会拆成可比较的维度
-- 区分稳定知识与必须实时核验的信息
-- 用公开信号补充结论，而不是完全依赖模型直觉
-- 最后输出建议、风险点和下一轮要问清楚的问题
+- 双 Offer 对比：围绕成长性、技术深度、团队成熟度、稳定性与个人匹配度进行综合分析
+- 原文接入：支持直接粘贴 `JD`、`Offer`、面试纪要、`HR` 补充信息
+- 结构化解析：将非结构化文本整理为可编辑字段，降低录入成本
+- 工作台持久化：保存候选人画像、Offer 信息、研究运行记录与分析结果
+- 异步研究任务：先返回基线分析，再在后台补全实时研究结果
+- 引用与核验：输出公开信号来源、风险点和待确认事项
+- 多级降级：实时研究失败时自动切换到更稳定路径，避免整条链路不可用
 
-这个项目想解决的，就是“如何把 LLM、检索和传统后端工程真正组合成一个可用产品”，而不是做一个 AI 套壳 demo。
+## 产品界面
 
-## 当前能力
+- 候选人画像：职业方向、风险偏好、优先项
+- 机会录入区：两份机会并排编辑与比较
+- 原文接入区：解析 `JD / Offer / 面试反馈 / HR 信息`
+- 研究结果区：推荐结论、横向对比、风险提示、引用来源
+- 工作台历史：查看最近研究运行并恢复历史结果
 
-### 产品能力
-
-- 候选人画像录入：目标岗位、风险偏好、优先项
-- 双 Offer 对比：支持并排录入两个机会
-- 工作台持久化：Offer、画像、运行记录保存在后端
-- 原文接入：支持直接粘贴 `JD / Offer 原文 / 面试反馈 / HR 补充信息`
-- 结构化解析：把原始文本整理成可编辑草稿
-- 决策记忆：保留最近分析记录，方便回放和比较
-
-### 研究引擎能力
-
-- `Heuristic` 基线分析：完全本地规则判断
-- `Retrieval-first` 实时研究：先拿公开证据，再交给模型做结构化总结
-- Evidence Quality Gate：去重、URL 规范化、质量分、时效性惩罚
-- Fallback 机制：研究失败时自动回退到更安全的路径
-- Stage Timings：可追踪每个研究阶段的耗时和状态
-- 宽松 JSON 解析：兼容真实 provider 返回代码块 / 夹杂说明文字的情况
-
-### 演示能力
-
-- `标准分析`：真实研究链路
-- `快速判断`：只跑规则基线
-- `离线体验`：使用本地固定证据跑完整流程，不依赖外部模型
-
-## 技术栈
+## 系统架构
 
 ### 前端
 
@@ -56,67 +36,39 @@
 - `Spring Boot 3`
 - `Spring Web`
 - `Spring Data JPA`
-- `H2`（当前用于本地持久化）
+- `H2`（本地持久化）
 
-### AI / Research
+### 研究引擎
 
-- Retrieval-first 架构
-- Kimi / Moonshot live provider（保留）
-- OpenAI-compatible structuring provider
-- 本地 mock search gateway
-- Deterministic live provider（本地可复现演示链路）
+- `Retrieval-first` 研究链路
+- Kimi / Moonshot Live Provider
+- OpenAI-compatible 结构化模型
+- Evidence Quality Gate
+- Retrieval Cache / Freshness Gate
+- 宽松 JSON 解析与超时重试
+- Deterministic Provider / Mock Search Gateway
 
-## 系统设计
+## 决策流程
 
-### 1. 输入层
+1. 用户录入两份 Offer 或粘贴原始材料
+2. 后端解析文本并生成结构化草稿
+3. 基于稳定字段生成一版基线分析
+4. 异步触发实时研究任务
+5. 检索层收集公开证据并进行质量门控
+6. 模型基于证据生成结构化研究卡片
+7. Java 服务合并研究结果、评分、风险和建议
+8. 前端展示最终推荐、对比视图与引用来源
 
-用户可以通过两种方式进入系统：
+## 运行模式
 
-- 直接手填两份 Offer
-- 粘贴 `JD / Offer / 面试纪要 / HR 信息` 原文，让后端先解析成结构化草稿
+- `标准分析`
+  - 启用实时研究链路，适合完整体验
+- `快速判断`
+  - 仅使用本地规则分析，响应最快
+- `离线体验`
+  - 使用本地固定证据与 deterministic provider，适合稳定演示和开发联调
 
-### 2. 决策层
-
-后端会先基于稳定信息生成一版基线判断：
-
-- 成长速度
-- 技术深度
-- 团队成熟度
-- 公司稳定性
-- 个人匹配度
-
-### 3. 研究层
-
-当前主链路不是“让一个模型自己搜、自己想、自己输出”，而是：
-
-1. 检索层先收集公开证据
-2. 证据经过质量门控、缓存和时效性判断
-3. 结构化模型只基于这些证据生成研究结论
-4. Java 后端再把研究结果合并回评分与建议
-
-### 4. 降级层
-
-如果实时研究失败：
-
-- 优先回退到 retrieval fallback
-- 再不行回退到本地 deterministic / heuristic
-
-这样系统不会因为单个模型超时就完全不可用。
-
-## 项目结构
-
-```text
-.
-├── src/                  # Next.js 前端
-├── public/               # 静态资源
-├── server/               # Spring Boot 后端
-│   ├── src/main/java/... # 决策、研究、工作台、检索相关实现
-│   └── src/test/java/... # 后端测试
-├── .env.example
-└── README.md
-```
-
-## 本地启动
+## 快速开始
 
 ### 1. 启动前端
 
@@ -125,7 +77,7 @@ npm install
 npm run dev
 ```
 
-默认地址：
+前端默认运行在：
 
 ```text
 http://localhost:3000
@@ -138,21 +90,29 @@ cd server
 mvn spring-boot:run
 ```
 
-默认地址：
+后端默认运行在：
 
 ```text
 http://localhost:8080
 ```
 
+### 3. 打开工作台
+
+访问：
+
+```text
+http://localhost:3000
+```
+
 ## 环境变量
 
-前端默认读取：
+### 前端
 
 ```text
 NEXT_PUBLIC_DECISION_API_URL=http://localhost:8080/api/v1/decision/analyze
 ```
 
-### 开启实时研究
+### 实时研究总开关
 
 ```bash
 export APP_LIVE_RESEARCH_ENABLED=true
@@ -184,9 +144,7 @@ export APP_RETRIEVAL_PROVIDER=generic-json
 export APP_RETRIEVAL_ENDPOINT=http://127.0.0.1:8080/api/v1/mock-search/search
 ```
 
-### 实时研究超时
-
-当前可以通过下面的变量调整结构化请求预算：
+### 超时预算
 
 ```bash
 export LIVE_RESEARCH_CONNECT_TIMEOUT_SECONDS=10
@@ -194,75 +152,74 @@ export LIVE_RESEARCH_REQUEST_TIMEOUT_SECONDS=90
 export LIVE_RESEARCH_TIMEOUT_SECONDS=90
 ```
 
-## 当前推荐的体验方式
+## 本地推荐配置
 
-### 想看完整产品流程
+### 稳定离线联调
 
-- 启动前后端
-- 使用 `标准分析`
-- 粘贴自己的真实 `JD / Offer` 原文
+```bash
+export APP_LIVE_RESEARCH_ENABLED=true
+export APP_RETRIEVAL_ENABLED=true
+export APP_RETRIEVAL_PROVIDER=generic-json
+export APP_RETRIEVAL_ENDPOINT=http://127.0.0.1:8080/api/v1/mock-search/search
+```
 
-### 想稳定本地试用
+前端选择 `离线体验` 即可运行完整链路。
 
-- 使用 `离线体验`
-- 不依赖外部模型，也能走完整研究流程
+### 实时研究联调
 
-### 想做快速基线比较
+```bash
+export APP_LIVE_RESEARCH_ENABLED=true
+export APP_RETRIEVAL_ENABLED=true
+export LIVE_STRUCTURING_PROVIDER=openai-compatible
+```
 
-- 使用 `快速判断`
+前端选择 `标准分析`，系统会先返回基线结果，再异步补全实时研究内容。
 
-## 现在已经做到什么程度
+## 关键接口
 
-### 作为面试项目
+### 决策分析
 
-已经远超普通 CRUD：
+- `POST /api/v1/decision/analyze`
+- `GET /api/v1/decision/capabilities`
 
-- 有明确产品形态
-- 有 Java 后端主导的业务系统
-- 有 Retrieval-first 研究架构
-- 有异步任务、降级策略、可观测 trace
-- 有真实模型接入与真实超时治理
+### 工作台
 
-### 作为个人体验产品
+- `GET /api/v1/workspace/default`
+- `PUT /api/v1/workspace/default/profile`
+- `PUT /api/v1/workspace/default/offers/{slot}`
+- `POST /api/v1/workspace/default/intake/parse`
 
-已经可以用了，尤其适合：
+### 异步研究任务
 
-- 先快速比较两份机会
-- 整理面试信息和 HR 补充信息
-- 形成下一轮沟通的问题清单
-- 留下自己的决策过程记录
+- `POST /api/v1/workspace/default/run-jobs`
+- `GET /api/v1/workspace/default/run-jobs/{runId}`
 
-但它还不是“完全成品”，目前仍有边界：
+## 项目结构
 
-- 复杂薪资包、职级、部门差异的理解还不够细
-- 多用户体系还没做
-- 当前数据库还是 `H2`，还没切正式 `PostgreSQL`
-- 真实搜索源能力还可以继续增强
-- provider failover 还可以做得更强
+```text
+.
+├── src/                    # Next.js 前端
+├── public/                 # 静态资源
+├── server/                 # Spring Boot 后端
+│   ├── src/main/java/...   # 决策、研究、工作台、检索实现
+│   └── src/test/java/...   # 后端测试
+├── .env.example
+└── README.md
+```
 
-## 下一步规划
+## 质量保障
 
-1. 接入更强的真实搜索源
-2. 做多模型 failover，提升实时研究稳定性
-3. 引入 `PostgreSQL` 和更正式的用户持久化
-4. 补充更细的 Offer 字段：职级、业务线、薪资包细项、汇报关系
-5. 加强“为什么这次建议和上次不一样”的版本对比能力
+- 前端静态检查：`npm run lint`
+- 前端生产构建：`npm run build`
+- 后端单元测试：`cd server && mvn test`
 
-## 适合怎么讲这个项目
+## 部署说明
 
-如果你用它做面试项目，建议重点讲这三件事：
+- 前端可部署到 `Vercel` 或任意支持 `Next.js` 的 Node 环境
+- 后端可部署为标准 `Spring Boot` 服务
+- 当前默认使用 `H2` 进行本地持久化，生产环境建议切换到 `PostgreSQL`
+- 检索层支持接入真实搜索源或自建搜索网关
 
-1. 这不是聊天框，而是一个决策工作台  
-2. 研究引擎采用 retrieval-first，而不是把搜网和推理都压给单模型  
-3. 真正的难点不只是接模型，而是超时、降级、证据质量和可追溯性
+## License
 
----
-
-如果你希望把它继续往产品级推进，最值得做的下一步不是继续堆 UI，而是把：
-
-- `真实搜索源`
-- `provider failover`
-- `正式数据库`
-- `复杂 Offer 字段建模`
-
-这几块补齐。届时它会更像一个真正可持续演进的 AI 决策产品，而不是单轮分析工具。
+本仓库采用根目录中的 [LICENSE](LICENSE)。
